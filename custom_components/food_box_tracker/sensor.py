@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -32,6 +33,8 @@ async def async_setup_entry(
         RecipeCountSensor(coordinator, entry, provider_name),
         DeliverySlotSensor(coordinator, entry, provider_name),
         BoxTypeSensor(coordinator, entry, provider_name),
+        LastUpdateSensor(coordinator, entry, provider_name),
+        LastErrorSensor(coordinator, entry, provider_name),
     ]
 
     # Combined sensors are created once for the whole domain, not per-entry.
@@ -165,6 +168,39 @@ class BoxTypeSensor(_FoodBoxSensorBase):
         if self._data and self._data.next_order:
             return self._data.next_order.box_type
         return None
+
+
+class LastUpdateSensor(_FoodBoxSensorBase):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:clock-check-outline"
+
+    def __init__(self, coordinator, entry, provider_name):
+        super().__init__(coordinator, entry, provider_name)
+        self._attr_unique_id = f"{entry.entry_id}_last_update"
+        self._attr_name = f"{provider_name} Last Update"
+
+    @property
+    def native_value(self) -> datetime | None:
+        return self.coordinator.last_successful_update
+
+
+class LastErrorSensor(_FoodBoxSensorBase):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:alert-circle-outline"
+
+    def __init__(self, coordinator, entry, provider_name):
+        super().__init__(coordinator, entry, provider_name)
+        self._attr_unique_id = f"{entry.entry_id}_last_error"
+        self._attr_name = f"{provider_name} Last Error"
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.last_error or "ok"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"last_update_success": self.coordinator.last_update_success}
 
 
 # ---------------------------------------------------------------------------

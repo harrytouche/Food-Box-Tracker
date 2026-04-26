@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -16,6 +17,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class FoodBoxCoordinator(DataUpdateCoordinator[DeliveryInfo]):
+    last_successful_update: datetime | None = None
+    last_error: str | None = None
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -35,7 +39,10 @@ class FoodBoxCoordinator(DataUpdateCoordinator[DeliveryInfo]):
     async def _async_update_data(self) -> DeliveryInfo:
         try:
             result = await self.provider.get_delivery_info()
+            self.last_successful_update = datetime.now(timezone.utc)
+            self.last_error = None
             async_dispatcher_send(self.hass, SIGNAL_COORDINATOR_UPDATED)
             return result
         except Exception as err:
+            self.last_error = str(err)
             raise UpdateFailed(f"Error fetching {self.provider.name} delivery info: {err}") from err
