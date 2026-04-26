@@ -1,0 +1,8 @@
+{
+  "name": "Food Box Tracker",
+  "domains": ["sensor"],
+  "documentation": "https://github.com/harrytouche/food-box-tracker",
+  "codeowners": ["@harrytouche"],
+  "homeassistant": "2023.1.0",
+  "iot_class": "cloud_polling"
+}

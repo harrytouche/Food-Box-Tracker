@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add Food Box Account",
+        "description": "Enter your account credentials for your food box provider.",
+        "data": {
+          "provider": "Provider",
+          "username": "Email address",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the provider. Check your network and try again.",
+      "invalid_auth": "Invalid email or password.",
+      "unknown": "Unexpected error. Check the logs for details."
+    },
+    "abort": {
+      "already_configured": "This account is already configured."
+    }
+  }
+}

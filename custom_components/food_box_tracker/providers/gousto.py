@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+import logging
+from datetime import date
+from typing import Any
+
+from .base import DeliveryInfo, FoodBoxProvider, OrderInfo
+
+_LOGGER = logging.getLogger(__name__)
+
+# Unofficial Gousto API — endpoints may change without notice
+_AUTH_URL = "https://api2.gousto.co.uk/oauth/2.0/token"
+_ORDERS_URL = "https://api2.gousto.co.uk/orders/v2.0/orders"
+
+
+class GoustoProvider(FoodBoxProvider):
+    _access_token: str | None = None
+
+    @property
+    def name(self) -> str:
+        return "Gousto"
+
+    async def authenticate(self) -> bool:
+        payload = {
+            "grant_type": "password",
+            "username": self._username,
+            "password": self._password,
+            "client_id": "7ea5d5b9-2a5b-4f26-a46e-2bec99f0f8c0",
+            "client_secret": "",
+            "scope": "",
+        }
+        async with self._session.post(_AUTH_URL, data=payload) as resp:
+            if resp.status != 200:
+                _LOGGER.debug("Gousto auth failed: HTTP %s", resp.status)
+                return False
+            data: dict[str, Any] = await resp.json()
+            self._access_token = data.get("access_token")
+            return bool(self._access_token)
+
+    async def _fetch_orders(self) -> list[dict[str, Any]]:
+        headers = {"Authorization": f"Bearer {self._access_token}"}
+        params = {"limit": 10, "sort": "delivery_date", "direction": "asc"}
+
+        async with self._session.get(_ORDERS_URL, headers=headers, params=params) as resp:
+            if resp.status == 401:
+                await self.authenticate()
+                headers["Authorization"] = f"Bearer {self._access_token}"
+                async with self._session.get(_ORDERS_URL, headers=headers, params=params) as retry:
+                    data = await retry.json()
+            else:
+                data = await resp.json()
+
+        return data.get("data", [])
+
+    async def get_delivery_info(self) -> DeliveryInfo:
+        if not self._access_token:
+            await self.authenticate()
+
+        raw_orders = await self._fetch_orders()
+        today = date.today()
+        upcoming: list[OrderInfo] = []
+
+        for order in raw_orders:
+            delivery_str: str = order.get("delivery_date", "")
+            if not delivery_str:
+                continue
+            try:
+                delivery_date = date.fromisoformat(delivery_str[:10])
+            except ValueError:
+                continue
+            if delivery_date < today:
+                continue
+
+            recipes = order.get("recipe_items", [])
+            recipe_names = [r.get("title", "") for r in recipes if isinstance(r, dict)]
+            box = order.get("box", {})
+            slot = order.get("delivery_slot", {})
+            slot_str = None
+            if isinstance(slot, dict):
+                slot_str = f"{slot.get('delivery_start', '')} – {slot.get('delivery_end', '')}".strip(" –") or None
+
+            upcoming.append(OrderInfo(
+                delivery_date=delivery_date,
+                order_status=order.get("state", "unknown"),
+                recipe_count=len(recipes),
+                box_type=box.get("type") if isinstance(box, dict) else None,
+                recipes=recipe_names,
+                delivery_slot=slot_str,
+                order_number=str(order.get("id", "")),
+                price=order.get("prices", {}).get("total"),
+            ))
+
+        upcoming.sort(key=lambda o: o.delivery_date or date.max)
+        return DeliveryInfo(
+            provider_name=self.name,
+            next_order=upcoming[0] if upcoming else None,
+            upcoming_orders=upcoming,
+        )
