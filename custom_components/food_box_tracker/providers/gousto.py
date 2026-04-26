@@ -10,8 +10,8 @@ from .base import DeliveryInfo, FoodBoxProvider, OrderInfo
 _LOGGER = logging.getLogger(__name__)
 
 # Unofficial Gousto API — endpoints may change without notice
-_AUTH_URL = "https://api2.gousto.co.uk/oauth/2.0/token"
-_ORDERS_URL = "https://api2.gousto.co.uk/orders/v2.0/orders"
+_AUTH_URL = "https://production-api.gousto.co.uk/oauth/2.0/token"
+_ORDERS_URL = "https://production-api.gousto.co.uk/user/current/orders"
 
 
 class GoustoProvider(FoodBoxProvider):
@@ -40,7 +40,7 @@ class GoustoProvider(FoodBoxProvider):
 
     async def _fetch_orders(self) -> list[dict[str, Any]]:
         headers = {"Authorization": f"Bearer {self._access_token}"}
-        params = {"limit": 10, "sort": "delivery_date", "direction": "asc"}
+        params = {"limit": 10, "sort_order": "desc", "state": "pending"}
 
         async with self._session.get(_ORDERS_URL, headers=headers, params=params) as resp:
             if resp.status == 401:
@@ -51,7 +51,7 @@ class GoustoProvider(FoodBoxProvider):
             else:
                 data = await resp.json()
 
-        return data.get("data", [])
+        return data.get("result", {}).get("data", [])
 
     async def get_delivery_info(self) -> DeliveryInfo:
         if not self._access_token:
@@ -85,7 +85,7 @@ class GoustoProvider(FoodBoxProvider):
                 delivery_date=delivery_date,
                 order_status=status,
                 recipe_count=len(recipes),
-                box_type=box.get("type") if isinstance(box, dict) else None,
+                box_type=box.get("box_type") if isinstance(box, dict) else None,
                 recipes=recipe_names,
                 delivery_slot=slot_str,
                 order_number=str(order.get("id", "")),
