@@ -30,10 +30,11 @@ class DeliveryInfo:
 
 
 class FoodBoxProvider(ABC):
-    def __init__(self, session, username: str, password: str) -> None:
+    def __init__(self, session, username: str | None = None, password: str | None = None, **kwargs) -> None:
         self._session = session
         self._username = username
         self._password = password
+        self._extra_config = kwargs
 
     @abstractmethod
     async def authenticate(self) -> bool:

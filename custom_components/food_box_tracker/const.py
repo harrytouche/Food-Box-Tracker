@@ -5,6 +5,7 @@ DOMAIN = "food_box_tracker"
 CONF_PROVIDER = "provider"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
+CONF_ACCESS_TOKEN = "access_token"
 
 PROVIDER_GOUSTO = "gousto"
 PROVIDER_GREEN_CHEF = "green_chef"

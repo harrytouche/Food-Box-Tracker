@@ -15,7 +15,9 @@ _DELIVERIES_URL = "https://www.greenchef.co.uk/api/v2/customers/me/subscriptions
 
 
 class GreenChefProvider(FoodBoxProvider):
-    _auth_token: str | None = None
+    def __init__(self, session, username: str | None = None, password: str | None = None, **kwargs) -> None:
+        super().__init__(session, username, password, **kwargs)
+        self._auth_token = kwargs.get("access_token")
 
     @property
     def name(self) -> str:

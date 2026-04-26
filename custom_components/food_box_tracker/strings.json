@@ -3,11 +3,12 @@
     "step": {
       "user": {
         "title": "Add Food Box Account",
-        "description": "Enter your account credentials for your food box provider.",
+        "description": "Enter your account credentials. For Gousto, automatic login is often blocked by captcha; you can find your 'access_token' in your browser cookies (v1_oauth_token) and paste it below.",
         "data": {
           "provider": "Provider",
           "username": "Email address",
-          "password": "Password"
+          "password": "Password",
+          "access_token": "Access Token (Optional for Gousto)"
         }
       }
     },

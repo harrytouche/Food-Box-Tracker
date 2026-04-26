@@ -15,13 +15,19 @@ _ORDERS_URL = "https://production-api.gousto.co.uk/user/current/orders"
 
 
 class GoustoProvider(FoodBoxProvider):
-    _access_token: str | None = None
+    def __init__(self, session, username: str | None = None, password: str | None = None, **kwargs) -> None:
+        super().__init__(session, username, password, **kwargs)
+        self._access_token = kwargs.get("access_token")
 
     @property
     def name(self) -> str:
         return "Gousto"
 
     async def authenticate(self) -> bool:
+        if self._access_token:
+            return True
+
+        # Fallback to automated login (often blocked by captcha)
         payload = {
             "grant_type": "password",
             "username": self._username,

@@ -11,6 +11,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_PROVIDER,
     CONF_USERNAME,
+    CONF_ACCESS_TOKEN,
     DOMAIN,
     PROVIDER_GOUSTO,
     PROVIDERS,
@@ -24,7 +25,8 @@ _SCHEMA = vol.Schema(
     {
         vol.Required(CONF_PROVIDER): vol.In(PROVIDERS),
         vol.Required(CONF_USERNAME): str,
-        vol.Required(CONF_PASSWORD): str,
+        vol.Optional(CONF_PASSWORD): str,
+        vol.Optional(CONF_ACCESS_TOKEN): str,
     }
 )
 
@@ -41,12 +43,11 @@ class FoodBoxConfigFlow(ConfigFlow, domain=DOMAIN):
             session = async_get_clientsession(self.hass)
             provider_id: str = user_input[CONF_PROVIDER]
             username: str = user_input[CONF_USERNAME]
-            password: str = user_input[CONF_PASSWORD]
 
             provider = (
-                GoustoProvider(session, username, password)
+                GoustoProvider(session, **user_input)
                 if provider_id == PROVIDER_GOUSTO
-                else GreenChefProvider(session, username, password)
+                else GreenChefProvider(session, **user_input)
             )
 
             try:
