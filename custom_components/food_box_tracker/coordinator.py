@@ -4,9 +4,10 @@ import logging
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, UPDATE_INTERVAL, PROVIDER_GOUSTO, PROVIDER_GREEN_CHEF
+from .const import DOMAIN, UPDATE_INTERVAL, PROVIDER_GOUSTO, PROVIDER_GREEN_CHEF, SIGNAL_COORDINATOR_UPDATED
 from .providers.base import DeliveryInfo
 from .providers.gousto import GoustoProvider
 from .providers.green_chef import GreenChefProvider
@@ -33,6 +34,8 @@ class FoodBoxCoordinator(DataUpdateCoordinator[DeliveryInfo]):
 
     async def _async_update_data(self) -> DeliveryInfo:
         try:
-            return await self.provider.get_delivery_info()
+            result = await self.provider.get_delivery_info()
+            async_dispatcher_send(self.hass, SIGNAL_COORDINATOR_UPDATED)
+            return result
         except Exception as err:
             raise UpdateFailed(f"Error fetching {self.provider.name} delivery info: {err}") from err

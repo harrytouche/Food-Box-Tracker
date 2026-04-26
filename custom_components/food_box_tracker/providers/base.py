@@ -18,6 +18,7 @@ class OrderInfo:
     delivery_slot: Optional[str] = None
     order_number: Optional[str] = None
     price: Optional[float] = None
+    needs_recipe_selection: bool = False
 
 
 @dataclass

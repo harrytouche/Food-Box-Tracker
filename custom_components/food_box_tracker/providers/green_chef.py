@@ -4,6 +4,7 @@ import logging
 from datetime import date
 from typing import Any
 
+from ..const import GREEN_CHEF_NEEDS_SELECTION_STATUSES
 from .base import DeliveryInfo, FoodBoxProvider, OrderInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -78,15 +79,17 @@ class GreenChefProvider(FoodBoxProvider):
 
             slot = delivery.get("delivery_slot") or delivery.get("time_slot")
 
+            status = delivery.get("status", "unknown")
             upcoming.append(OrderInfo(
                 delivery_date=delivery_date,
-                order_status=delivery.get("status", "unknown"),
+                order_status=status,
                 recipe_count=meal_count,
                 box_type=delivery.get("plan_name") or delivery.get("box_type"),
                 recipes=recipe_names,
                 delivery_slot=str(slot) if slot else None,
                 order_number=str(delivery.get("id", "")),
                 price=delivery.get("total_price") or delivery.get("price"),
+                needs_recipe_selection=status in GREEN_CHEF_NEEDS_SELECTION_STATUSES,
             ))
 
         upcoming.sort(key=lambda o: o.delivery_date or date.max)

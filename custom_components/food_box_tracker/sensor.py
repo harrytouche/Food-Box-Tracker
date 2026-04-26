@@ -4,13 +4,18 @@ from datetime import date
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_PROVIDER, DOMAIN, PROVIDERS
+from .const import CONF_PROVIDER, DOMAIN, PROVIDERS, SIGNAL_COORDINATOR_UPDATED
 from .coordinator import FoodBoxCoordinator
 from .providers.base import DeliveryInfo
+
+
+def _all_coordinators(hass: HomeAssistant) -> list[FoodBoxCoordinator]:
+    return [v for v in hass.data.get(DOMAIN, {}).values() if isinstance(v, FoodBoxCoordinator)]
 
 
 async def async_setup_entry(
@@ -21,16 +26,29 @@ async def async_setup_entry(
     coordinator: FoodBoxCoordinator = hass.data[DOMAIN][entry.entry_id]
     provider_name = PROVIDERS[entry.data[CONF_PROVIDER]]
 
-    async_add_entities(
-        [
-            NextDeliveryDateSensor(coordinator, entry, provider_name),
-            OrderStatusSensor(coordinator, entry, provider_name),
-            RecipeCountSensor(coordinator, entry, provider_name),
-            DeliverySlotSensor(coordinator, entry, provider_name),
-            BoxTypeSensor(coordinator, entry, provider_name),
-        ]
-    )
+    entities: list[SensorEntity] = [
+        NextDeliveryDateSensor(coordinator, entry, provider_name),
+        OrderStatusSensor(coordinator, entry, provider_name),
+        RecipeCountSensor(coordinator, entry, provider_name),
+        DeliverySlotSensor(coordinator, entry, provider_name),
+        BoxTypeSensor(coordinator, entry, provider_name),
+    ]
 
+    # Combined sensors are created once for the whole domain, not per-entry.
+    domain_data = hass.data[DOMAIN]
+    if not domain_data.get("_combined_sensors_added"):
+        domain_data["_combined_sensors_added"] = True
+        entities += [
+            CombinedNextDeliverySensor(hass),
+            CombinedNextDeliveryProviderSensor(hass),
+        ]
+
+    async_add_entities(entities)
+
+
+# ---------------------------------------------------------------------------
+# Per-account sensors
+# ---------------------------------------------------------------------------
 
 class _FoodBoxSensorBase(CoordinatorEntity[FoodBoxCoordinator], SensorEntity):
     def __init__(
@@ -147,3 +165,73 @@ class BoxTypeSensor(_FoodBoxSensorBase):
         if self._data and self._data.next_order:
             return self._data.next_order.box_type
         return None
+
+
+# ---------------------------------------------------------------------------
+# Combined sensors (one instance across all configured accounts)
+# ---------------------------------------------------------------------------
+
+_COMBINED_DEVICE = {
+    "identifiers": {(DOMAIN, "combined")},
+    "name": "Food Box Tracker",
+}
+
+
+class _CombinedSensorBase(SensorEntity):
+    _attr_should_poll = False
+    _attr_device_info = _COMBINED_DEVICE
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                SIGNAL_COORDINATOR_UPDATED,
+                self._handle_coordinator_update,
+            )
+        )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self.async_write_ha_state()
+
+
+class CombinedNextDeliverySensor(_CombinedSensorBase):
+    _attr_unique_id = f"{DOMAIN}_combined_next_delivery_date"
+    _attr_name = "Next Food Box Delivery"
+    _attr_device_class = SensorDeviceClass.DATE
+    _attr_icon = "mdi:calendar-star"
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        super().__init__(hass)
+
+    @property
+    def native_value(self) -> date | None:
+        dates = [
+            c.data.next_order.delivery_date
+            for c in _all_coordinators(self.hass)
+            if c.data and c.data.next_order and c.data.next_order.delivery_date
+        ]
+        return min(dates) if dates else None
+
+
+class CombinedNextDeliveryProviderSensor(_CombinedSensorBase):
+    _attr_unique_id = f"{DOMAIN}_combined_next_delivery_provider"
+    _attr_name = "Next Food Box Provider"
+    _attr_icon = "mdi:truck-delivery"
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        super().__init__(hass)
+
+    @property
+    def native_value(self) -> str | None:
+        candidates = [
+            (c.data.next_order.delivery_date, c.data.provider_name)
+            for c in _all_coordinators(self.hass)
+            if c.data and c.data.next_order and c.data.next_order.delivery_date
+        ]
+        if not candidates:
+            return None
+        return min(candidates, key=lambda t: t[0])[1]

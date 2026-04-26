@@ -4,6 +4,7 @@ import logging
 from datetime import date
 from typing import Any
 
+from ..const import GOUSTO_NEEDS_SELECTION_STATUSES
 from .base import DeliveryInfo, FoodBoxProvider, OrderInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,15 +80,17 @@ class GoustoProvider(FoodBoxProvider):
             if isinstance(slot, dict):
                 slot_str = f"{slot.get('delivery_start', '')} – {slot.get('delivery_end', '')}".strip(" –") or None
 
+            status = order.get("state", "unknown")
             upcoming.append(OrderInfo(
                 delivery_date=delivery_date,
-                order_status=order.get("state", "unknown"),
+                order_status=status,
                 recipe_count=len(recipes),
                 box_type=box.get("type") if isinstance(box, dict) else None,
                 recipes=recipe_names,
                 delivery_slot=slot_str,
                 order_number=str(order.get("id", "")),
                 price=order.get("prices", {}).get("total"),
+                needs_recipe_selection=status in GOUSTO_NEEDS_SELECTION_STATUSES,
             ))
 
         upcoming.sort(key=lambda o: o.delivery_date or date.max)

@@ -11,7 +11,7 @@ from .coordinator import FoodBoxCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -32,4 +32,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
+        # Reset combined-entity creation guards when the last account is removed
+        remaining = [v for v in hass.data[DOMAIN].values() if isinstance(v, FoodBoxCoordinator)]
+        if not remaining:
+            hass.data[DOMAIN].pop("_combined_sensors_added", None)
+            hass.data[DOMAIN].pop("_combined_binary_added", None)
     return unload_ok
