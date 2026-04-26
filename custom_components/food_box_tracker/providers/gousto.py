@@ -10,7 +10,7 @@ from .base import DeliveryInfo, FoodBoxProvider, OrderInfo
 _LOGGER = logging.getLogger(__name__)
 
 # Unofficial Gousto API — endpoints may change without notice
-_AUTH_URL = "https://production-api.gousto.co.uk/oauth/2.0/token"
+_AUTH_URL = "https://www.gousto.co.uk/login"
 _ORDERS_URL = "https://production-api.gousto.co.uk/user/current/orders"
 
 
@@ -26,11 +26,12 @@ class GoustoProvider(FoodBoxProvider):
             "grant_type": "password",
             "username": self._username,
             "password": self._password,
-            "client_id": "7ea5d5b9-2a5b-4f26-a46e-2bec99f0f8c0",
-            "client_secret": "",
-            "scope": "",
+            "rememberMe": "true",
         }
-        async with self._session.post(_AUTH_URL, data=payload) as resp:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"
+        }
+        async with self._session.post(_AUTH_URL, data=payload, headers=headers) as resp:
             if resp.status != 200:
                 _LOGGER.debug("Gousto auth failed: HTTP %s", resp.status)
                 return False
